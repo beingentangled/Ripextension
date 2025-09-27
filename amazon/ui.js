@@ -2,7 +2,7 @@
 (function () {
     'use strict';
 
-    const Amazon = window.CryptoInsureAmazon = window.CryptoInsureAmazon || {};
+    const Amazon = window.ripextensionAmazon = window.ripextensionAmazon || {};
     const CONFIG = Amazon.CONFIG;
 
     function calculateInsurancePremium(orderTotal) {
@@ -152,6 +152,80 @@
         `;
     }
 
+    function parsePriceToUsd(value) {
+        if (!value) {
+            return null;
+        }
+
+        const numberOnly = String(value)
+            .replace(/[^0-9.,]/g, '')
+            .replace(/,/g, '');
+
+        if (!numberOnly) {
+            return null;
+        }
+
+        const parsed = parseFloat(numberOnly);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function resolvePurchaseDate(orderInfo) {
+        const dateCandidates = [
+            orderInfo?.invoiceDetails?.orderDate,
+            orderInfo?.orderDate,
+            orderInfo?.orderItems?.[0]?.orderDate
+        ].filter(Boolean);
+
+        for (const candidate of dateCandidates) {
+            const parsed = new Date(candidate);
+            if (!Number.isNaN(parsed.getTime())) {
+                return parsed.toISOString().split('T')[0];
+            }
+        }
+
+        return new Date().toISOString().split('T')[0];
+    }
+
+    function buildInvoicePayload(orderInfo) {
+        const priceSources = [
+            orderInfo?.invoiceDetails?.unitPrice,
+            orderInfo?.orderTotal,
+            orderInfo?.orderItems?.[0]?.price
+        ];
+
+        let purchasePrice = null;
+        for (const source of priceSources) {
+            const parsed = parsePriceToUsd(source);
+            if (parsed !== null) {
+                purchasePrice = parsed;
+                break;
+            }
+        }
+
+        const orderNumber = orderInfo.orderId || orderInfo?.invoiceDetails?.orderNumber || `ORDER_${Date.now()}`;
+        const productId = (orderInfo.asin || orderInfo?.orderItems?.[0]?.asin || 'UNKNOWN_PRODUCT').toString();
+        const description = orderInfo.productName || orderInfo?.orderItems?.[0]?.name || 'Default invoice data for policy purchase testing';
+
+        return {
+            orderNumber,
+            purchasePriceUsd: (purchasePrice ?? 0).toFixed(2),
+            purchaseDate: resolvePurchaseDate(orderInfo),
+            productId,
+            description
+        };
+    }
+
+    function buildInvoiceQrData(invoicePayload) {
+        const jsonString = JSON.stringify(invoicePayload);
+        const encoded = encodeURIComponent(jsonString);
+        const size = 180;
+
+        return {
+            jsonString,
+            src: `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}`
+        };
+    }
+
     function createInsuranceModal(orderInfo) {
         const existingModal = document.getElementById('cryptoinsure-modal');
         if (existingModal) {
@@ -164,6 +238,8 @@
 
         const invoiceDetailsMarkup = renderInvoiceDetails(orderInfo.invoiceDetails);
         const safeInvoiceUrl = orderInfo.invoiceUrl ? escapeHtml(orderInfo.invoiceUrl) : null;
+        const invoicePayload = buildInvoicePayload(orderInfo);
+        const qrImageId = `cryptoinsure-qr-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
         modal.innerHTML = `
             <div class="cryptoinsure-modal-content">
@@ -194,8 +270,8 @@
                         ` : ''}
                     </div>
                     <div class="cryptoinsure-insurance-calculation">
-                        <h3>Insurance Premium Calculation</h3>
                         <div class="cryptoinsure-premium-box">
+                            <h3>Insurance Premium Calculation</h3>
                             <div class="cryptoinsure-premium-details">
                                 <p><strong>Order Value:</strong> ${orderInfo.orderTotal || 'N/A'}</p>
                                 <p><strong>Insurance Coverage:</strong> 100% of order value</p>
@@ -217,10 +293,17 @@
                         <p>⚡ <strong>Instant Claims:</strong> Smart contract automation</p>
                         <p>🌍 <strong>Global Coverage:</strong> Worldwide protection</p>
                     </div>
+                    <div class="cryptoinsure-qr-section">
+                        <h3>Mobile Checkout</h3>
+                        <div class="cryptoinsure-qr-wrapper">
+                            <img id="${qrImageId}" class="cryptoinsure-qr-image" alt="ripextension mobile checkout QR" />
+                        </div>
+                        <p class="cryptoinsure-qr-info">Scan to continue using mobile.</p>
+                    </div>
                 </div>
                 <div class="cryptoinsure-modal-footer">
                     <button class="cryptoinsure-btn-secondary" id="cryptoinsure-cancel">Cancel</button>
-                    <button class="cryptoinsure-btn-primary" id="cryptoinsure-get-quote">Get Quote</button>
+                    <button class="cryptoinsure-btn-primary" id="cryptoinsure-get-quote">Get Quote Via Webapp</button>
                 </div>
             </div>
         `;
@@ -232,6 +315,14 @@
         document.getElementById('cryptoinsure-get-quote').addEventListener('click', function () {
             handleGetQuote(orderInfo);
         });
+
+        const qrImageElement = document.getElementById(qrImageId);
+        if (qrImageElement) {
+            const qrData = buildInvoiceQrData(invoicePayload);
+            qrImageElement.src = qrData.src;
+            qrImageElement.dataset.invoiceJson = qrData.jsonString;
+            console.log('ripextension: Generated invoice payload for QR:', invoicePayload);
+        }
 
         modal.addEventListener('click', function (event) {
             if (event.target === modal) {

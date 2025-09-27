@@ -42,10 +42,12 @@
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border-radius: 12px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    max-width: 500px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
+    max-width: 720px;
+    width: min(96vw, 720px);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     position: relative;
     border: 1px solid #e0e0e0;
 }
@@ -54,7 +56,7 @@
 .cryptoinsure-modal-header {
     background: linear-gradient(135deg, #ff9900 0%, #e47911 100%);
     color: white;
-    padding: 20px 24px;
+    padding: 16px 22px;
     border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
@@ -63,8 +65,8 @@
 
 .cryptoinsure-modal-header h2 {
     margin: 0;
-    font-size: 20px;
-    font-weight: bold;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .cryptoinsure-close-btn {
@@ -90,15 +92,36 @@
 
 /* Modal Body */
 .cryptoinsure-modal-body {
-    padding: 24px;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    justify-items: stretch;
+    align-items: stretch;
+    flex: 1;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 248, 255, 0.9) 100%);
+}
+
+.cryptoinsure-order-info,
+.cryptoinsure-insurance-calculation,
+.cryptoinsure-crypto-info,
+.cryptoinsure-qr-section {
+    width: 100%;
+    flex: 1 1 auto;
+    box-sizing: border-box;
 }
 
 .cryptoinsure-order-info {
-    background-color: #f7f8fa;
+    background-color: rgba(255, 255, 255, 0.88);
     border: 1px solid #d5d9d9;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 16px;
-    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+    justify-content: space-between;
 }
 
 .cryptoinsure-order-info h3 {
@@ -146,7 +169,7 @@
 
 /* Insurance Options */
 .cryptoinsure-insurance-options {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .cryptoinsure-insurance-options h3 {
@@ -198,15 +221,66 @@
 .cryptoinsure-crypto-info {
     background: linear-gradient(135deg, #e8f5e8 0%, #f0f8ff 100%);
     border: 1px solid #d0e8d0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 16px;
-    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+    justify-content: space-between;
+    min-height: 260px;
 }
 
 .cryptoinsure-crypto-info p {
     margin: 8px 0;
     font-size: 14px;
     color: #0F1111;
+}
+
+/* Mobile QR Checkout */
+.cryptoinsure-qr-section {
+    padding: 16px;
+    border-radius: 10px;
+    background: #f7f8fa;
+    border: 1px solid #d0e8d0;
+    text-align: center;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 100%;
+    min-height: 260px;
+}
+
+.cryptoinsure-qr-section h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #0F1111;
+}
+
+.cryptoinsure-qr-wrapper {
+    margin: 16px 0 12px;
+    display: flex;
+    justify-content: center;
+}
+
+.cryptoinsure-qr-image {
+    width: 180px;
+    height: 180px;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
+.cryptoinsure-qr-info {
+    margin: 0;
+    font-size: 13px;
+    color: #0F1111;
+    opacity: 0.7;
+    margin-top: auto;
 }
 
 /* Modal Footer */
@@ -218,6 +292,7 @@
     justify-content: flex-end;
     background-color: #fafafa;
     border-radius: 0 0 12px 12px;
+    flex-shrink: 0;
 }
 
 /* Buttons */
@@ -271,12 +346,27 @@
     }
 
     .cryptoinsure-modal-body {
-        padding: 20px;
+        padding: 18px;
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .cryptoinsure-order-info,
+    .cryptoinsure-insurance-calculation,
+    .cryptoinsure-crypto-info,
+    .cryptoinsure-qr-section {
+        width: 100%;
+        max-width: 100%;
     }
 
     .cryptoinsure-modal-footer {
         padding: 16px 20px;
         flex-direction: column;
+    }
+
+    .cryptoinsure-qr-image {
+        width: 140px;
+        height: 140px;
     }
 
     .cryptoinsure-btn-primary,
@@ -375,13 +465,17 @@
 
 /* Insurance Calculation Styling */
 .cryptoinsure-insurance-calculation {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
 }
 
 .cryptoinsure-insurance-calculation h3 {
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
     font-size: 16px;
-    font-weight: bold;
+    font-weight: 600;
     color: #0F1111;
 }
 
@@ -389,8 +483,9 @@
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border: 2px solid #ff9900;
     border-radius: 8px;
-    padding: 16px;
+    padding: 14px;
     box-shadow: 0 2px 8px rgba(255, 153, 0, 0.1);
+    flex: 1 1 auto;
 }
 
 .cryptoinsure-premium-details p {
@@ -406,7 +501,7 @@
 }
 
 .cryptoinsure-coverage-info {
-    margin-top: 12px;
+    margin-top: auto;
     padding-top: 12px;
     border-top: 1px solid #ddd;
 }

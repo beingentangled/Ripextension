@@ -28,7 +28,8 @@
     "https://*.amazon.it/*",
     "https://*.amazon.es/*",
     "https://*.amazon.in/*",
-    "https://*.amazon.co.jp/*"
+    "https://*.amazon.co.jp/*",
+    "https://api.qrserver.com/*"
   ],
   "content_scripts": [
     {
