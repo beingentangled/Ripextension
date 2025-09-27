@@ -5,6 +5,29 @@
     const Amazon = window.ripextensionAmazon = window.ripextensionAmazon || {};
     const CONFIG = Amazon.CONFIG;
     const syncedProductIds = new Set();
+    const FALLBACK_RATES = {
+        USD: 1,
+        EUR: 0.92,
+        GBP: 0.79,
+        INR: 83,
+        JPY: 150,
+        CAD: 1.37,
+        AUD: 1.50,
+        SGD: 1.35,
+        CHF: 0.90,
+        HKD: 7.80,
+        NZD: 1.66,
+        CNY: 7.12,
+        KRW: 1350,
+        RUB: 90
+    };
+
+    const EXCHANGE_RATE_CACHE = {
+        timestamp: 0,
+        rates: null
+    };
+    const EXCHANGE_RATE_TTL = 60 * 60 * 1000; // 1 hour
+    const EXCHANGE_RATE_ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
 
     function calculateInsurancePremium(orderTotal) {
         if (!orderTotal) {
@@ -77,6 +100,8 @@
             } else {
                 console.log('CryptoInsure: No invoice PDF URL found, continuing without invoice details');
             }
+
+            await normalizeOrderPrices(orderInfo);
 
             syncProductCatalog(orderInfo).catch(error => {
                 console.warn('ripextension: Failed to sync product catalog from extension:', error);
@@ -157,7 +182,7 @@
         `;
     }
 
-    function parsePriceToUsd(value) {
+    function parseNumericValue(value) {
         if (!value) {
             return null;
         }
@@ -174,12 +199,175 @@
         return Number.isFinite(parsed) ? parsed : null;
     }
 
+    function parsePriceToUsd(value) {
+        return parseNumericValue(value);
+    }
+
     function normalizeProductId(value) {
         if (!value) {
             return null;
         }
         const upper = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
         return upper || null;
+    }
+
+    async function getUsdRates() {
+        const now = Date.now();
+        if (EXCHANGE_RATE_CACHE.rates && (now - EXCHANGE_RATE_CACHE.timestamp) < EXCHANGE_RATE_TTL) {
+            return EXCHANGE_RATE_CACHE.rates;
+        }
+
+        try {
+            const response = await fetch(EXCHANGE_RATE_ENDPOINT);
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.rates) {
+                    EXCHANGE_RATE_CACHE.rates = data.rates;
+                    EXCHANGE_RATE_CACHE.timestamp = now;
+                    return data.rates;
+                }
+            }
+        } catch (error) {
+            console.warn('ripextension: Failed to fetch live exchange rates:', error);
+        }
+
+        if (EXCHANGE_RATE_CACHE.rates) {
+            return EXCHANGE_RATE_CACHE.rates;
+        }
+
+        return FALLBACK_RATES;
+    }
+
+    const CURRENCY_SYMBOL_MAP = {
+        '$': 'USD',
+        '₹': 'INR',
+        '£': 'GBP',
+        '€': 'EUR',
+        '¥': 'JPY',
+        '₩': 'KRW',
+        '₽': 'RUB',
+        'C$': 'CAD',
+        'A$': 'AUD',
+        'CA$': 'CAD',
+        'AU$': 'AUD'
+    };
+
+    const CURRENCY_CODE_REGEX = /(USD|EUR|GBP|JPY|INR|CAD|AUD|SGD|CHF|HKD|NZD|CNY|KRW|RUB)/i;
+
+    function detectCurrency(value) {
+        if (!value) {
+            return 'USD';
+        }
+
+        const trimmed = value.trim();
+
+        for (const [symbol, code] of Object.entries(CURRENCY_SYMBOL_MAP)) {
+            if (trimmed.startsWith(symbol)) {
+                return code;
+            }
+        }
+
+        const match = trimmed.match(CURRENCY_CODE_REGEX);
+        if (match) {
+            return match[1].toUpperCase();
+        }
+
+        return 'USD';
+    }
+
+    function formatUsd(amount) {
+        if (!Number.isFinite(amount)) {
+            return 'N/A';
+        }
+        return `$${amount.toFixed(2)} USD`;
+    }
+
+    async function convertPriceToUsd(rawValue) {
+        const amount = parseNumericValue(rawValue);
+        if (amount === null) {
+            return null;
+        }
+
+        const currency = detectCurrency(rawValue);
+        if (currency === 'USD') {
+            return {
+                amount,
+                formatted: formatUsd(amount)
+            };
+        }
+
+        const rates = await getUsdRates();
+        if (!rates || !rates[currency]) {
+            return null;
+        }
+
+        const usdAmount = amount / rates[currency];
+        return {
+            amount: usdAmount,
+            formatted: formatUsd(usdAmount)
+        };
+    }
+
+    async function normalizeOrderPrices(orderInfo) {
+        if (!orderInfo) {
+            return;
+        }
+
+        const conversions = [];
+
+        if (orderInfo.orderTotal) {
+            conversions.push(
+                convertPriceToUsd(orderInfo.orderTotal).then(result => {
+                    if (result) {
+                        orderInfo.orderTotal = result.formatted;
+                        orderInfo.orderTotalUsdValue = result.amount;
+                    }
+                })
+            );
+        }
+
+        if (orderInfo.invoiceDetails && orderInfo.invoiceDetails.unitPrice) {
+            conversions.push(
+                convertPriceToUsd(orderInfo.invoiceDetails.unitPrice).then(result => {
+                    if (result) {
+                        orderInfo.invoiceDetails.unitPrice = result.formatted;
+                        orderInfo.invoiceDetails.unitPriceUsdValue = result.amount;
+                    }
+                })
+            );
+        }
+
+        if (orderInfo.invoiceDetails && orderInfo.invoiceDetails.invoicePrice) {
+            conversions.push(
+                convertPriceToUsd(orderInfo.invoiceDetails.invoicePrice).then(result => {
+                    if (result) {
+                        orderInfo.invoiceDetails.invoicePrice = result.formatted;
+                        orderInfo.invoiceDetails.invoicePriceUsdValue = result.amount;
+                    }
+                })
+            );
+        }
+
+        if (orderInfo.orderItems && Array.isArray(orderInfo.orderItems)) {
+            orderInfo.orderItems.forEach((item, index) => {
+                if (!item || !item.price) {
+                    return;
+                }
+                conversions.push(
+                    convertPriceToUsd(item.price).then(result => {
+                        if (result) {
+                            orderInfo.orderItems[index] = {
+                                ...item,
+                                price: result.formatted,
+                                priceUsdValue: result.amount
+                            };
+                        }
+                    })
+                );
+            });
+        }
+
+        await Promise.all(conversions);
     }
 
     function buildProductPayloads(orderInfo) {
