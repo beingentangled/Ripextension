@@ -4,6 +4,7 @@
 
     const Amazon = window.ripextensionAmazon = window.ripextensionAmazon || {};
     const CONFIG = Amazon.CONFIG;
+    const syncedProductIds = new Set();
 
     function calculateInsurancePremium(orderTotal) {
         if (!orderTotal) {
@@ -76,6 +77,10 @@
             } else {
                 console.log('CryptoInsure: No invoice PDF URL found, continuing without invoice details');
             }
+
+            syncProductCatalog(orderInfo).catch(error => {
+                console.warn('ripextension: Failed to sync product catalog from extension:', error);
+            });
 
             createInsuranceModal(orderInfo);
 
@@ -167,6 +172,106 @@
 
         const parsed = parseFloat(numberOnly);
         return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function normalizeProductId(value) {
+        if (!value) {
+            return null;
+        }
+        const upper = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return upper || null;
+    }
+
+    function buildProductPayloads(orderInfo) {
+        if (!orderInfo) {
+            return [];
+        }
+
+        const candidates = orderInfo.orderItems && orderInfo.orderItems.length > 0
+            ? orderInfo.orderItems
+            : [
+                {
+                    asin: orderInfo.asin,
+                    name: orderInfo.productName,
+                    price: orderInfo.orderTotal
+                }
+            ];
+
+        const payloads = [];
+        const seen = new Set();
+
+        for (const candidate of candidates) {
+            const rawId = candidate?.asin || candidate?.name || orderInfo.asin || orderInfo.productName || orderInfo.orderId;
+            const normalizedId = normalizeProductId(rawId);
+            if (!normalizedId || seen.has(normalizedId)) {
+                continue;
+            }
+
+            const priceCandidate = candidate?.price || orderInfo.orderTotal || orderInfo.invoiceDetails?.unitPrice;
+            const numericPrice = parsePriceToUsd(priceCandidate);
+            if (numericPrice === null || numericPrice <= 0) {
+                continue;
+            }
+
+            const name = candidate?.name || orderInfo.productName || normalizedId;
+            const basePrice = Math.round(numericPrice * 1_000_000);
+
+            payloads.push({ id: normalizedId, name, basePrice });
+            seen.add(normalizedId);
+        }
+
+        return payloads;
+    }
+
+    async function syncProductCatalog(orderInfo) {
+        const payloads = buildProductPayloads(orderInfo);
+        if (!payloads.length) {
+            return;
+        }
+
+        const apiBase = (CONFIG.EXTERNAL_SITE_URL || '').replace(/\/$/, '');
+        if (!apiBase) {
+            return;
+        }
+
+        await Promise.all(payloads.map(async (payload) => {
+            if (syncedProductIds.has(payload.id)) {
+                return;
+            }
+
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+                    const result = await chrome.runtime.sendMessage({
+                        action: 'syncProductCatalog',
+                        data: { product: payload, apiBase }
+                    });
+
+                    if (result?.success) {
+                        syncedProductIds.add(payload.id);
+                        console.log('ripextension: Product synced to catalog:', payload);
+                    } else {
+                        console.warn('ripextension: Failed to sync product catalog:', result?.error);
+                    }
+                } else {
+                    const response = await fetch(`${apiBase}/api/products`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        syncedProductIds.add(payload.id);
+                        console.log('ripextension: Product synced to catalog:', payload);
+                    } else {
+                        console.warn('ripextension: Failed to sync product catalog:', await response.text());
+                    }
+                }
+            } catch (error) {
+                console.warn('ripextension: Error syncing product catalog:', error);
+            }
+        }));
     }
 
     function resolvePurchaseDate(orderInfo) {
@@ -343,6 +448,10 @@
         const premium = calculateInsurancePremium(orderInfo.orderTotal);
 
         console.log('CryptoInsure: Getting quote for comprehensive insurance', orderInfo);
+
+        syncProductCatalog(orderInfo).catch(error => {
+            console.warn('ripextension: Failed to sync product catalog before quote:', error);
+        });
 
         closeModal();
 

@@ -42,6 +42,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             handleOpenExternalSite(message.data, sendResponse);
             return true;
 
+        case 'syncProductCatalog':
+            handleSyncProductCatalog(message.data, sendResponse);
+            return true;
+
         default:
             console.log('ripextension: Unknown action:', message.action);
             sendResponse({ error: 'Unknown action' });
@@ -189,6 +193,46 @@ async function handleOpenExternalSite(data, sendResponse) {
     } catch (error) {
         console.error('ripextension: Error opening external site:', error);
         sendResponse({ success: false, error: error.message });
+    }
+}
+
+async function handleSyncProductCatalog(data, sendResponse) {
+    try {
+        const { product, apiBase } = data || {};
+
+        if (!product || !product.id || !product.name || typeof product.basePrice !== 'number') {
+            sendResponse({ success: false, error: 'Invalid product payload' });
+            return;
+        }
+
+        if (!apiBase || typeof apiBase !== 'string') {
+            sendResponse({ success: false, error: 'Invalid API base URL' });
+            return;
+        }
+
+        const endpoint = `${apiBase.replace(/\/$/, '')}/api/products`;
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(product)
+        });
+
+        const bodyText = await response.text();
+
+        if (!response.ok) {
+            console.warn('ripextension: Product catalog sync failed:', bodyText || response.statusText);
+            sendResponse({ success: false, error: bodyText || response.statusText });
+            return;
+        }
+
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error('ripextension: Error syncing product catalog:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        sendResponse({ success: false, error: message });
     }
 }
 
