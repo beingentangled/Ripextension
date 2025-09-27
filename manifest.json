@@ -1,10 +1,10 @@
 {
-  "name": "CryptoInsure - Crypto Insurance",
-  "description": "Professional crypto insurance with Ethereum sign-in",
+  "name": "RipExtension",
+  "description": "Crypto Insurance for Amazon",
   "version": "0.0.1",
   "manifest_version": 3,
   "action": {
-    "default_title": "CryptoInsure"
+    "default_title": "RipExtension"
   },
   "background": {
     "service_worker": "background.js"
@@ -17,11 +17,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:3000/",
-    "http://localhost:3001/",
     "http://localhost:3002/",
-    "http://localhost:3003/",
-    "https://cryptoinsure.vercel.app/*",
     "https://*.vercel.app/*",
     "https://*.metamask.io/",
     "https://*.amazon.com/*",
@@ -63,7 +59,6 @@
       "matches": [
         "http://localhost:3002/*",
         "http://localhost:3003/*",
-        "https://cryptoinsure.vercel.app/*",
         "https://*.vercel.app/*"
       ],
       "js": [
@@ -90,7 +85,6 @@
       "http://localhost:3001/*",
       "http://localhost:3002/*",
       "http://localhost:3003/*",
-      "https://cryptoinsure.vercel.app/*",
       "https://*.vercel.app/*"
     ]
   },
