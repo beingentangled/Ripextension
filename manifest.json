@@ -1,0 +1,100 @@
+{
+  "name": "CryptoInsure - Crypto Insurance",
+  "description": "Professional crypto insurance with Ethereum sign-in",
+  "version": "0.0.1",
+  "manifest_version": 3,
+  "action": {
+    "default_title": "CryptoInsure"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "cookies",
+    "activeTab",
+    "storage",
+    "identity",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/",
+    "http://localhost:3001/",
+    "http://localhost:3002/",
+    "http://localhost:3003/",
+    "https://cryptoinsure.vercel.app/*",
+    "https://*.vercel.app/*",
+    "https://*.metamask.io/",
+    "https://*.amazon.com/*",
+    "https://*.amazon.co.uk/*",
+    "https://*.amazon.ca/*",
+    "https://*.amazon.de/*",
+    "https://*.amazon.fr/*",
+    "https://*.amazon.it/*",
+    "https://*.amazon.es/*",
+    "https://*.amazon.in/*",
+    "https://*.amazon.co.jp/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.amazon.com/*",
+        "https://*.amazon.co.uk/*",
+        "https://*.amazon.ca/*",
+        "https://*.amazon.de/*",
+        "https://*.amazon.fr/*",
+        "https://*.amazon.it/*",
+        "https://*.amazon.es/*",
+        "https://*.amazon.in/*",
+        "https://*.amazon.co.jp/*"
+      ],
+      "js": [
+        "amazon/config.js",
+        "amazon/order-extraction.js",
+        "amazon/invoice.js",
+        "amazon/ui.js",
+        "amazon/main.js"
+      ],
+      "css": [
+        "amazon-injector.css"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "http://localhost:3002/*",
+        "http://localhost:3003/*",
+        "https://cryptoinsure.vercel.app/*",
+        "https://*.vercel.app/*"
+      ],
+      "js": [
+        "shared-storage.js",
+        "vercel-bridge.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "shared-storage.js",
+        "libs/pdfjs/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "http://localhost:3001/*",
+      "http://localhost:3002/*",
+      "http://localhost:3003/*",
+      "https://cryptoinsure.vercel.app/*",
+      "https://*.vercel.app/*"
+    ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
