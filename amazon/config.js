@@ -5,7 +5,8 @@
     const Amazon = window.ripextensionAmazon = window.ripextensionAmazon || {};
 
     const CONFIG = {
-        EXTERNAL_SITE_URL: 'http://localhost:3002',
+        EXTERNAL_SITE_URL: 'https://rip-sandy.vercel.app',
+        // EXTERNAL_SITE_URL: 'http://localhost:3002',
         ORDER_HISTORY_PATTERNS: [
             /\/gp\/your-account\/order-history/,
             /\/gp\/css\/order-details/,
